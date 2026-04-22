@@ -134,6 +134,29 @@
     .drawer-field-label { font-size: 0.8125rem; color: #94a3b8; }
     .drawer-field-value { font-size: 0.8125rem; color: #e2e8f0; font-weight: 500; text-align: right; max-width: 60%; word-break: break-word; }
 
+    /* ===== MODAL ===== */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 55; display: none; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; padding: 2rem; }
+    .modal h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem; }
+    .modal .form-row { margin-bottom: 1.25rem; }
+    .modal .form-row label { display: block; margin-bottom: 0.375rem; font-size: 0.8125rem; font-weight: 500; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+    .modal .form-row input, .modal .form-row select, .modal .form-row textarea { width: 100%; padding: 0.625rem 0.875rem; background: rgba(15,23,42,0.6); border: 1px solid rgba(51,65,85,0.5); border-radius: 0.5rem; color: #e2e8f0; outline: none; transition: all 0.2s; font-family: inherit; font-size: inherit; }
+    .modal .form-row textarea { min-height: 80px; resize: vertical; }
+    .modal .form-row input:focus, .modal .form-row select:focus, .modal .form-row textarea:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+    .modal .form-row input::placeholder, .modal .form-row textarea::placeholder { color: #475569; }
+    .modal .form-row .hint { font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem; }
+    .modal-actions .btn-cancel { padding: 0.625rem 1.25rem; background: rgba(51,65,85,0.5); color: #e2e8f0; border: 1px solid rgba(51,65,85,0.5); border-radius: 0.5rem; cursor: pointer; font-family: inherit; font-size: 0.875rem; font-weight: 500; transition: all 0.2s; }
+    .modal-actions .btn-cancel:hover { background: rgba(51,65,85,0.8); }
+    .modal-actions .btn-submit { padding: 0.625rem 1.25rem; background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; border: none; border-radius: 0.5rem; cursor: pointer; font-family: inherit; font-size: 0.875rem; font-weight: 600; transition: all 0.2s; }
+    .modal-actions .btn-submit:hover { filter: brightness(1.1); box-shadow: 0 4px 12px rgba(99,102,241,0.35); }
+    .modal-actions .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+    .star-picker { display: flex; gap: 0.25rem; }
+    .star-picker span { font-size: 1.5rem; cursor: pointer; color: #475569; transition: color 0.15s; }
+    .star-picker span.filled { color: #fbbf24; }
+    .star-picker span:hover { color: #fbbf24; }
+
     /* ===== TOAST ===== */
     .toast-container { position: fixed; top: 1rem; right: 1rem; z-index: 60; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
     .toast { pointer-events: auto; padding: 0.75rem 1rem; min-width: 280px; max-width: 400px; border-radius: 0.75rem; box-shadow: 0 4px 12px rgba(0,0,0,0.3); font-size: 0.875rem; animation: toastIn 0.3s ease forwards; }
@@ -265,6 +288,7 @@
             <div class="filter-bar">
               <input type="search" id="ent-search" placeholder="Search by name, tags, location..." oninput="debounceEntSearch()" style="min-width:250px;">
               <select id="ent-type-filter" onchange="filterEntities()"><option value="all">All Types</option><option value="person">People</option><option value="business">Businesses</option></select>
+              <button class="btn-sm" style="margin-left:auto;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;font-weight:600;" onclick="openAddModal()">+ Add Entity</button>
             </div>
             <div id="bulk-bar" class="bulk-toolbar glass">
               <span class="bulk-count" id="bulk-count">0 selected</span>
@@ -312,6 +336,64 @@
 <div id="detail-drawer" class="detail-drawer">
   <div class="drawer-head"><h3 id="drawer-title">Entity</h3><button class="drawer-close" onclick="closeDrawer()">&times;</button></div>
   <div class="drawer-body" id="drawer-body"></div>
+</div>
+
+<!-- Add Entity Modal -->
+<div id="add-modal" class="modal-overlay" onclick="if(event.target===this)closeAddModal()">
+  <div class="modal glass">
+    <h2>Add Entity</h2>
+    <form id="add-form" onsubmit="return handleAddEntity(event)">
+      <div class="form-row">
+        <label for="add-name">Name *</label>
+        <input type="text" id="add-name" placeholder="e.g. Joy Dahiya" required>
+      </div>
+      <div class="form-row">
+        <label for="add-type">Type *</label>
+        <select id="add-type" required>
+          <option value="person">Person</option>
+          <option value="business">Business</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label for="add-bio">Bio / Description</label>
+        <textarea id="add-bio" placeholder="A short description of this entity..."></textarea>
+      </div>
+      <div class="form-row">
+        <label for="add-tags">Tags</label>
+        <input type="text" id="add-tags" placeholder="e.g. plumber, electrician, koramangala">
+        <div class="hint">Comma-separated list of skills, services, or keywords</div>
+      </div>
+      <div class="form-row">
+        <label for="add-locations">Locations</label>
+        <input type="text" id="add-locations" placeholder="e.g. Koramangala, Bangalore">
+        <div class="hint">Comma-separated list of locations</div>
+      </div>
+      <div class="form-row">
+        <label>Reputation</label>
+        <div class="star-picker" id="star-picker">
+          <span onclick="setStars(1)">&#9733;</span>
+          <span onclick="setStars(2)">&#9733;</span>
+          <span onclick="setStars(3)">&#9733;</span>
+          <span onclick="setStars(4)">&#9733;</span>
+          <span onclick="setStars(5)">&#9733;</span>
+        </div>
+        <input type="hidden" id="add-reputation" value="">
+      </div>
+      <div class="form-row">
+        <label for="add-owner">Introduced By</label>
+        <input type="text" id="add-owner" placeholder="e.g. pete.saldanha">
+      </div>
+      <div class="form-row">
+        <label for="add-images">Image URLs</label>
+        <input type="text" id="add-images" placeholder="https://...">
+        <div class="hint">Comma-separated URLs</div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeAddModal()">Cancel</button>
+        <button type="submit" class="btn-submit" id="add-submit-btn">Add Entity</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Toast container -->
@@ -785,6 +867,100 @@ async function checkHealth() {
     var dotR = document.createElement('span'); dotR.className = 'status-dot red'; statusEl.appendChild(dotR);
     statusEl.appendChild(document.createTextNode('Offline'));
   }
+}
+
+// ========== ADD ENTITY MODAL ==========
+var addStarValue = 0;
+
+function openAddModal() {
+  document.getElementById('add-form').reset();
+  addStarValue = 0;
+  document.getElementById('add-reputation').value = '';
+  updateStarDisplay();
+  document.getElementById('add-modal').classList.add('open');
+}
+
+function closeAddModal() {
+  document.getElementById('add-modal').classList.remove('open');
+}
+
+function setStars(n) {
+  addStarValue = (addStarValue === n) ? 0 : n; // click same star to deselect
+  document.getElementById('add-reputation').value = addStarValue || '';
+  updateStarDisplay();
+}
+
+function updateStarDisplay() {
+  var stars = document.getElementById('star-picker').children;
+  for (var i = 0; i < stars.length; i++) {
+    if (i < addStarValue) stars[i].classList.add('filled');
+    else stars[i].classList.remove('filled');
+  }
+}
+
+async function handleAddEntity(e) {
+  e.preventDefault();
+  var btn = document.getElementById('add-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Adding...';
+
+  var name = document.getElementById('add-name').value.trim();
+  var type = document.getElementById('add-type').value;
+  var bio = document.getElementById('add-bio').value.trim();
+  var tagsRaw = document.getElementById('add-tags').value.trim();
+  var locsRaw = document.getElementById('add-locations').value.trim();
+  var reputation = document.getElementById('add-reputation').value;
+  var owner = document.getElementById('add-owner').value.trim();
+  var imagesRaw = document.getElementById('add-images').value.trim();
+
+  var tags = tagsRaw ? tagsRaw.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+  var locations = locsRaw ? locsRaw.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+  var imageUrls = imagesRaw ? imagesRaw.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+
+  // Build DOST event payload for /introduce
+  var payload = {
+    dostEvent: {
+      eventHint: 'introduce_request',
+      message: { text: bio || name },
+      session: { sessionId: 'admin-' + Date.now() },
+      categories: [{
+        dostObjects: [{
+          type: type === 'business' ? 'company' : 'human',
+          title: name,
+          body: bio,
+          tags: tags,
+          locations: locations,
+          reputation: reputation ? String(reputation) : '',
+          owner: owner,
+          imageUrls: imageUrls,
+          videoUrls: [],
+          audioUrls: [],
+          documentUrls: []
+        }]
+      }]
+    }
+  };
+
+  try {
+    var res = await fetch('/introduce', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
+      body: JSON.stringify(payload)
+    });
+    if (res.status === 401 || res.status === 403) { logout(); return; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    closeAddModal();
+    toast('Entity "' + name + '" added successfully', 'success');
+    // Refresh data
+    rawData = null;
+    loadEntities();
+  } catch (err) {
+    toast('Failed to add entity: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Add Entity';
+  }
+  return false;
 }
 
 // ========== INIT ==========
