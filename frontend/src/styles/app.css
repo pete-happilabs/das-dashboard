@@ -49,12 +49,21 @@ th { background: #0e1320; color: #697386; font-size: 11px; text-transform: upper
 th, td { padding: 11px 13px; border-bottom: 1px solid #141c28; vertical-align: middle; }
 td strong { display: block; color: #e8eaed; font-weight: 600; }
 td small { display: block; color: #697386; margin-top: 2px; }
+.toolbar-spacer { flex: 1; }
+.check-col { width: 40px; text-align: center; }
+.check-col input[type="checkbox"] { width: 16px; height: 16px; accent-color: #4f6ef7; cursor: pointer; }
+.selected-row { background: rgba(79, 110, 247, 0.08); }
+.danger-btn.fit { width: auto; }
 .actions { text-align: right; white-space: nowrap; }
 .actions button, .modal-actions button { margin-left: 8px; background: #0b0f19; color: #c8cdd3; border: 1px solid #1e293b; border-radius: 6px; padding: 7px 10px; }
 .actions .danger { color: #ff8b83; border-color: rgba(229, 83, 75, 0.25); }
 .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.58); display: grid; place-items: center; padding: 20px; z-index: 10; }
 .modal { width: min(560px, 100%); max-height: 92vh; overflow: auto; padding: 22px; }
 .modal-actions { display: flex; justify-content: flex-end; align-items: center; margin-top: 18px; }
+.confirm-modal { max-width: 420px; }
+.confirm-message { color: #a8b0bd; margin: 0 0 4px; line-height: 1.5; }
+.danger-btn { margin-left: 8px; background: #e5534b; color: white; border: 0; border-radius: 6px; padding: 8px 16px; font-weight: 600; }
+.danger-btn:hover { background: #d4443c; }
 .detail { padding: 22px; }
 .detail p { color: #8d96a7; }
 .detail strong { color: #e8eaed; }

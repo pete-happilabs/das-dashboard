@@ -142,10 +142,13 @@ function Entities() {
   const [query, setQuery] = useState("");
   const [type, setType] = useState("all");
   const [editing, setEditing] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+  const [selected, setSelected] = useState(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState("");
 
   async function refresh() {
-    try { setEntities(await getEntities()); } catch (err) { setError(err.message); }
+    try { setEntities(await getEntities()); setSelected(new Set()); } catch (err) { setError(err.message); }
   }
 
   useEffect(() => { refresh(); }, []);
@@ -156,8 +159,34 @@ function Entities() {
     return haystack.includes(query.toLowerCase());
   }), [entities, query, type]);
 
+  function toggleSelect(id) {
+    setSelected((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  }
+
+  function toggleAll() {
+    if (selected.size === filtered.length) setSelected(new Set());
+    else setSelected(new Set(filtered.map((e) => e.id)));
+  }
+
   async function remove(id) {
-    await deleteEntity(id);
+    try {
+      await deleteEntity(id);
+      setDeleting(null);
+      refresh();
+    } catch (err) {
+      setDeleting(null);
+      setError(err.message);
+    }
+  }
+
+  async function bulkRemove() {
+    setBulkDeleting(false);
+    const ids = [...selected];
+    const errors = [];
+    for (const id of ids) {
+      try { await deleteEntity(id); } catch (err) { errors.push(`${id}: ${err.message}`); }
+    }
+    if (errors.length) setError(`Failed to delete ${errors.length} entit${errors.length === 1 ? "y" : "ies"}: ${errors.join("; ")}`);
     refresh();
   }
 
@@ -167,23 +196,28 @@ function Entities() {
       <div className="toolbar">
         <input placeholder="Search entities..." value={query} onChange={(e) => setQuery(e.target.value)} />
         <select value={type} onChange={(e) => setType(e.target.value)}><option value="all">All Types</option><option value="person">People</option><option value="business">Businesses</option><option value="other">Other</option></select>
+        <span className="toolbar-spacer" />
+        {selected.size > 0 && <button className="danger-btn fit" onClick={() => setBulkDeleting(true)}>Delete {selected.size} selected</button>}
         <button className="primary fit" onClick={() => setEditing(emptyEntity)}>Add Entity</button>
       </div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Name</th><th>Type</th><th>Tags</th><th>Location</th><th>Reputation</th><th>Owner</th><th></th></tr></thead>
-          <tbody>{filtered.map((e) => <tr key={e.id}>
+          <thead><tr><th className="check-col"><input type="checkbox" checked={filtered.length > 0 && selected.size === filtered.length} onChange={toggleAll} /></th><th>Name</th><th>Type</th><th>Tags</th><th>Location</th><th>Reputation</th><th>Owner</th><th></th></tr></thead>
+          <tbody>{filtered.map((e) => <tr key={e.id} className={selected.has(e.id) ? "selected-row" : ""}>
+            <td className="check-col"><input type="checkbox" checked={selected.has(e.id)} onChange={() => toggleSelect(e.id)} /></td>
             <td><strong>{e.title}</strong><small>{e.id}</small></td>
             <td>{e.entity_type}</td>
             <td>{(e.tags || []).join(", ")}</td>
             <td>{(e.locations || [])[0] || "-"}</td>
             <td>{e.reputation || "-"}</td>
             <td>{e.owner || "-"}</td>
-            <td className="actions"><button onClick={() => setEditing(e)}>Edit</button><button className="danger" onClick={() => remove(e.id)}>Delete</button></td>
+            <td className="actions"><button onClick={() => setEditing(e)}>Edit</button><button className="danger" onClick={() => setDeleting(e)}>Delete</button></td>
           </tr>)}</tbody>
         </table>
       </div>
       {editing && <EntityModal entity={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh(); }} />}
+      {deleting && <ConfirmModal title="Delete Entity" message={`Delete "${deleting.title}"? This cannot be undone.`} confirmLabel="Delete" onConfirm={() => remove(deleting.id)} onCancel={() => setDeleting(null)} />}
+      {bulkDeleting && <ConfirmModal title="Delete Selected" message={`Delete ${selected.size} selected entit${selected.size === 1 ? "y" : "ies"}? This cannot be undone.`} confirmLabel={`Delete ${selected.size}`} onConfirm={bulkRemove} onCancel={() => setBulkDeleting(false)} />}
     </section>
   );
 }
@@ -237,6 +271,18 @@ function SettingsPage() {
 function BarList({ title, rows }) {
   const max = Math.max(1, ...rows.map(([, value]) => Number(value)));
   return <div className="card chart"><h2>{title}</h2>{rows.length ? rows.map(([label, value]) => <div className="bar-row" key={label}><span>{label}</span><div><i style={{ width: `${(Number(value) / max) * 100}%` }} /></div><b>{value}</b></div>) : <p className="muted">No data</p>}</div>;
+}
+
+function ConfirmModal({ title, message, confirmLabel, onConfirm, onCancel }) {
+  return (
+    <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onCancel()}>
+      <div className="modal card confirm-modal">
+        <h2>{title}</h2>
+        <p className="confirm-message">{message}</p>
+        <div className="modal-actions"><button onClick={onCancel}>Cancel</button><button className="danger-btn" onClick={onConfirm}>{confirmLabel}</button></div>
+      </div>
+    </div>
+  );
 }
 
 function Notice({ text, tone }) {
