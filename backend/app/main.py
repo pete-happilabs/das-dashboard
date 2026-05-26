@@ -21,7 +21,6 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(entities.router)
-app.include_router(entities.legacy_router)
 app.include_router(profile.router)
 
 

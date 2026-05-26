@@ -8,9 +8,6 @@ from app.services import vespa_client
 
 
 router = APIRouter(prefix="/api/das", tags=["das"], dependencies=[Depends(require_user)])
-legacy_router = APIRouter(tags=["legacy"], dependencies=[Depends(require_user)])
-
-
 class EntityPayload(BaseModel):
     title: str = Field(min_length=1)
     entity_type: str = "person"
@@ -75,29 +72,3 @@ async def analytics() -> dict:
     return build_analytics(store.list())
 
 
-@legacy_router.get("/analytics/data")
-async def legacy_analytics() -> dict:
-    if vespa_client.upstream_enabled():
-        return await vespa_client.get_analytics()
-    return build_analytics(store.list())
-
-
-@legacy_router.post("/introduce", status_code=status.HTTP_201_CREATED)
-def introduce(payload: dict) -> dict:
-    objects = payload.get("dostEvent", {}).get("categories", [{}])[0].get("dostObjects", [])
-    created = []
-    for obj in objects:
-        created.append(store.create({
-            "title": obj.get("title"),
-            "entity_type": "business" if obj.get("type") == "company" else "person",
-            "body": obj.get("body"),
-            "tags": obj.get("tags", []),
-            "locations": obj.get("locations", []),
-            "reputation": obj.get("reputation", ""),
-            "owner": obj.get("owner", ""),
-            "imageUrls": obj.get("imageUrls", []),
-            "videoUrls": obj.get("videoUrls", []),
-            "audioUrls": obj.get("audioUrls", []),
-            "documentUrls": obj.get("documentUrls", []),
-        }))
-    return {"created": created}
