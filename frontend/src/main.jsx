@@ -1,17 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { BarChart3, Database, LogOut, Settings, UserRound } from "lucide-react";
+import { BarChart3, Database } from "lucide-react";
 import {
-  clearToken,
   createEntity,
   deleteEntity,
   getAnalytics,
   getEntities,
-  getHealth,
-  getProfile,
-  getToken,
-  login,
-  setToken,
   updateEntity,
 } from "./api/client";
 import "./styles/app.css";
@@ -31,16 +25,7 @@ const emptyEntity = {
 };
 
 function App() {
-  const [authed, setAuthed] = useState(Boolean(getToken()));
   const [view, setView] = useState("analytics");
-
-  useEffect(() => {
-    const expire = () => setAuthed(false);
-    window.addEventListener("das:auth-expired", expire);
-    return () => window.removeEventListener("das:auth-expired", expire);
-  }, []);
-
-  if (!authed) return <Login onLogin={() => setAuthed(true)} />;
 
   return (
     <div className="shell">
@@ -49,55 +34,14 @@ function App() {
         <div className="nav-label">Vespa / DAS</div>
         <button className={view === "analytics" ? "active" : ""} onClick={() => setView("analytics")}><BarChart3 size={17} />Analytics</button>
         <button className={view === "entities" ? "active" : ""} onClick={() => setView("entities")}><Database size={17} />Entities</button>
-        <div className="nav-label">Account</div>
-        <button className={view === "profile" ? "active" : ""} onClick={() => setView("profile")}><UserRound size={17} />Profile</button>
-        <button className={view === "settings" ? "active" : ""} onClick={() => setView("settings")}><Settings size={17} />Settings</button>
       </aside>
       <main className="main">
         <header className="topbar">
           <h1>{view[0].toUpperCase() + view.slice(1)}</h1>
-          <button className="ghost" onClick={() => { clearToken(); setAuthed(false); }}><LogOut size={15} />Logout</button>
         </header>
         {view === "analytics" && <Analytics />}
         {view === "entities" && <Entities />}
-        {view === "profile" && <Profile />}
-        {view === "settings" && <SettingsPage />}
       </main>
-    </div>
-  );
-}
-
-function Login({ onLogin }) {
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function submit(e) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    try {
-      const data = await login(username, password);
-      setToken(data.token);
-      onLogin();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="login-screen">
-      <form className="login-card card" onSubmit={submit}>
-        <h1>DAS</h1>
-        <p>Admin Portal</p>
-        {error && <div className="error">{error}</div>}
-        <label>Username<input value={username} onChange={(e) => setUsername(e.target.value)} /></label>
-        <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
-        <button className="primary" disabled={loading}>{loading ? "Signing in..." : "Sign In"}</button>
-      </form>
     </div>
   );
 }
@@ -253,19 +197,6 @@ function EntityModal({ entity, onClose, onSaved }) {
       </form>
     </div>
   );
-}
-
-function Profile() {
-  const [profile, setProfile] = useState(null);
-  useEffect(() => { getProfile().then(setProfile); }, []);
-  if (!profile) return <Notice text="Loading profile..." />;
-  return <section className="content narrow"><div className="card detail"><h2>{profile.display_name}</h2><p>{profile.username}</p><p>Role: <strong>{profile.role}</strong></p><p>Permissions: {profile.permissions.join(", ")}</p></div></section>;
-}
-
-function SettingsPage() {
-  const [health, setHealth] = useState(null);
-  useEffect(() => { getHealth().then(setHealth).catch((err) => setHealth({ status: err.message })); }, []);
-  return <section className="content narrow"><div className="card detail"><h2>System</h2><p>API status: <strong>{health?.status || "checking"}</strong></p><p>Frontend: React + Vite</p><p>Backend: FastAPI</p></div></section>;
 }
 
 function BarList({ title, rows }) {
