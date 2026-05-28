@@ -15,3 +15,21 @@ Frontend-only static app. Calls the upstream DAS API directly from the browser �
 Browser → React SPA → DAS API (Vespa)
 ```
 
+## Setup
+
+```bash
+git clone https://github.com/HappiDost/das-dashboard.git
+cd das-dashboard/frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`.
+
+To build for production:
+
+```bash
+npm run build
+```
+
+Outputs static files to `frontend/dist/` — serve from anywhere.
