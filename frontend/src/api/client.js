@@ -1,10 +1,34 @@
-const API_BASE_URL = (import.meta.env.VITE_DAS_API_URL || "http://65.1.11.185:8121/api/vespa").replace(/\/+$/, "");
+const API_BASE_URL = (import.meta.env.VITE_DAS_API_URL || "/api/vespa").replace(/\/+$/, "");
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error("Request timed out — check if DAS is running");
+    throw new Error("API unreachable — check if DAS is running");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function retryFetch(url, options = {}, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fetchWithTimeout(url, options);
+    } catch (err) {
+      if (attempt === retries) throw err;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+}
 
 export async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   if (!headers.has("Content-Type") && options.body) headers.set("Content-Type", "application/json");
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  const response = await retryFetch(`${API_BASE_URL}${path}`, { ...options, headers });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.detail || `HTTP ${response.status}`);
@@ -47,23 +71,52 @@ function makeId(payload) {
   return `${prefix}.${slug}`;
 }
 
+// Vespa msmarco schema fields (excluding embedding which is server-managed)
+const VESPA_FIELDS = new Set([
+  "id", "title", "url", "body", "source", "owner", "profileEndpoint",
+  "tags", "type", "actions_json", "pricing_json", "reputation",
+  "locations_json", "locations", "name_tokens",
+  "imageUrls", "imageDescriptions", "videoUrls", "audioUrls",
+  "documentUrls", "documentTexts",
+]);
+
 function buildPayload(payload, docId) {
   const id = docId || payload.id || makeId(payload);
-  return {
+  const entityType = payload.entity_type || payload.type || typeFromId(id) || "other";
+
+  const merged = {
     ...payload,
     id,
     title: payload.title || payload.name || id,
-    entity_type: payload.entity_type || typeFromId(id) || "other",
+    type: entityType,
+    source: payload.source || entityType,
     body: payload.body || payload.bio || "",
     tags: payload.tags || [],
-    locations: payload.locations || [],
-    reputation: String(payload.reputation || ""),
     owner: payload.owner || "",
     imageUrls: payload.imageUrls || [],
-    videoUrls: payload.videoUrls || [],
-    audioUrls: payload.audioUrls || [],
-    documentUrls: payload.documentUrls || [],
   };
+
+  // Auto-sync profileEndpoint and actions_json
+  // If profileEndpoint changed, update the CHAT action URL in actions_json too
+  if (merged.profileEndpoint) {
+    try {
+      const actions = merged.actions_json ? JSON.parse(merged.actions_json) : [];
+      const chatAction = actions.find((a) => a.command === "CHAT");
+      if (chatAction) {
+        chatAction.data = merged.profileEndpoint;
+        merged.actions_json = JSON.stringify(actions);
+      } else if (actions.length === 0) {
+        merged.actions_json = JSON.stringify([{ command: "CHAT", displayText: "Talk", data: merged.profileEndpoint }]);
+      }
+    } catch { /* leave actions_json as-is if unparseable */ }
+  }
+
+  // Strip any fields not in the Vespa schema
+  const doc = {};
+  for (const [k, v] of Object.entries(merged)) {
+    if (VESPA_FIELDS.has(k)) doc[k] = v;
+  }
+  return doc;
 }
 
 export function buildAnalytics(documents) {
@@ -114,9 +167,21 @@ export function buildAnalytics(documents) {
 }
 
 export async function getEntities() {
-  const data = await api("/documents");
-  const items = data.items || [];
-  return items.map(normalizeDocument);
+  const PAGE_LIMIT = 50;
+  let allItems = [];
+  let offset = 0;
+  let total = Infinity;
+
+  while (offset < total) {
+    const data = await api(`/documents?offset=${offset}&limit=${PAGE_LIMIT}`);
+    const items = data.items || [];
+    allItems = allItems.concat(items);
+    total = data.total ?? items.length;
+    offset += PAGE_LIMIT;
+    if (items.length < PAGE_LIMIT) break;
+  }
+
+  return allItems.map(normalizeDocument);
 }
 
 export async function getAnalytics() {
@@ -129,8 +194,11 @@ export function createEntity(payload) {
   return api("/documents", { method: "POST", body: JSON.stringify(doc) });
 }
 
-export function updateEntity(id, payload) {
-  const doc = buildPayload(payload, id);
+export async function updateEntity(id, payload) {
+  // Fetch existing doc first to prevent wiping unedited fields (Vespa PUT replaces entire doc)
+  const existing = await api(`/documents/${encodeURIComponent(id)}`);
+  const merged = { ...existing, ...payload };
+  const doc = buildPayload(merged, id);
   return api(`/documents/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(doc) });
 }
 
